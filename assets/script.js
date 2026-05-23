@@ -1,14 +1,4 @@
 (function () {
-  // ── Theme toggle ────────────────────────────────────────
-  const root = document.documentElement;
-  const stored = null; // no localStorage in sandboxed iframes; use a variable
-  let theme =
-    root.getAttribute("data-theme") ||
-    (window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light");
-  root.setAttribute("data-theme", theme);
-
   function updateToggleIcon(btn, t) {
     if (!btn) return;
     btn.setAttribute(
@@ -43,16 +33,6 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    const themeBtn = document.querySelector("[data-theme-toggle]");
-    updateToggleIcon(themeBtn, theme);
-    if (themeBtn) {
-      themeBtn.addEventListener("click", function () {
-        theme = theme === "dark" ? "light" : "dark";
-        root.setAttribute("data-theme", theme);
-        updateToggleIcon(themeBtn, theme);
-      });
-    }
-
     openHashTarget();
     window.addEventListener("hashchange", openHashTarget);
 

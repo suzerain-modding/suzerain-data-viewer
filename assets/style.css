@@ -4,76 +4,7 @@
    Density: balanced (data-dense but breathable) */
 
 /* ── Design Tokens ──────────────────────────────────────── */
-:root,
-[data-theme="light"] {
-  --color-bg: #f7f6f2;
-  --color-surface: #f9f8f5;
-  --color-surface-2: #ffffff;
-  --color-surface-offset: #f0ede9;
-  --color-surface-dynamic: #e8e5e0;
-  --color-divider: #dcd9d5;
-  --color-border: #d4d1ca;
-
-  --color-text: #1c1a17;
-  --color-text-muted: #6b6965;
-  --color-text-faint: #b0aca7;
-  --color-text-inverse: #f9f8f4;
-
-  --color-primary: #01696f;
-  --color-primary-hover: #0c4e54;
-  --color-primary-bg: #d4e9ea;
-
-  --color-accent-entry: #2563a8;
-  --color-accent-entry-bg: #dbeafe;
-  --color-accent-link: #7c3aed;
-  --color-accent-link-bg: #ede9fe;
-  --color-accent-field: #0f766e;
-  --color-accent-field-bg: #ccfbf1;
-
-  --color-bool-true: #166534;
-  --color-bool-true-bg: #dcfce7;
-  --color-bool-false: #9f1239;
-  --color-bool-false-bg: #ffe4e6;
-
-  --color-code-bg: #f0ede8;
-  --color-code-text: #1c1a17;
-
-  --color-error: #b91c1c;
-  --color-error-bg: #fee2e2;
-
-  --shadow-sm: 0 1px 2px rgba(28, 26, 23, 0.06);
-  --shadow-md: 0 4px 12px rgba(28, 26, 23, 0.08);
-  --shadow-lg: 0 12px 32px rgba(28, 26, 23, 0.12);
-
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-full: 9999px;
-
-  --font-body: "Inter", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
-
-  --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
-  --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
-  --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-  --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
-  --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
-
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-
-  --transition: 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-[data-theme="dark"] {
+:root {
   --color-bg: #141312;
   --color-surface: #1c1b19;
   --color-surface-2: #232220;
@@ -112,42 +43,33 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    --color-bg: #141312;
-    --color-surface: #1c1b19;
-    --color-surface-2: #232220;
-    --color-surface-offset: #1a1918;
-    --color-surface-dynamic: #2c2b28;
-    --color-divider: #2e2c2a;
-    --color-border: #3a3836;
-    --color-text: #d4d2cf;
-    --color-text-muted: #7a7875;
-    --color-text-faint: #504e4c;
-    --color-text-inverse: #1c1a17;
-    --color-primary: #4f98a3;
-    --color-primary-hover: #3a8590;
-    --color-primary-bg: #1e3a3d;
-    --color-accent-entry: #60a5fa;
-    --color-accent-entry-bg: #1e3a5f;
-    --color-accent-link: #a78bfa;
-    --color-accent-link-bg: #2d2152;
-    --color-accent-field: #2dd4bf;
-    --color-accent-field-bg: #134040;
-    --color-bool-true: #4ade80;
-    --color-bool-true-bg: #14532d;
-    --color-bool-false: #f87171;
-    --color-bool-false-bg: #4c1d1d;
-    --color-code-bg: #1a1918;
-    --color-code-text: #c9c7c4;
-    --color-error: #f87171;
-    --color-error-bg: #4c1d1d;
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
-  }
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+  --text-xs: clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
+  --text-sm: clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
+  --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  --text-lg: clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
+  --text-xl: clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  --transition: 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Reset & Base ───────────────────────────────────────── */
@@ -824,11 +746,6 @@ button {
   transition:
     box-shadow var(--transition),
     border-color var(--transition);
-}
-
-.entity-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-primary);
 }
 
 .entity-top-row {

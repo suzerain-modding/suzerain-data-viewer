@@ -9,88 +9,97 @@ use log::info;
 use serde_json::Value;
 use simplelog::TermLogger;
 use std::{
-    fs::{copy, create_dir_all, read_dir},
+    fs::{File, copy, create_dir_all, read_dir},
     io::BufReader,
     time::Instant,
 };
 
 fn main() -> Result<()> {
-    let log_level = log::LevelFilter::Info;
     let multi = MultiProgress::new();
+    init_logger(&multi);
+    let json_files = find_json_files()?;
+    let chosen_file = select_json_file(json_files)?;
+
+    info!("Reading '{}'...", chosen_file);
+    let json = load_json(&chosen_file)?;
+    let root_type = json["_type"]
+        .as_str()
+        .context("Expected root '_type' field in JSON.")?;
+
+    info!("Root type: {}", root_type);
+    prepare_output()?;
+
+    let start = Instant::now();
+    route_root(&json, root_type, &multi)?;
+    info!(
+        "Done in {:.2?}. Open out/index.html to browse.",
+        start.elapsed()
+    );
+    Ok(())
+}
+
+fn init_logger(multi: &MultiProgress) {
+    let log_level = log::LevelFilter::Info;
     let logger = TermLogger::new(
         log_level,
         simplelog::Config::default(),
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto,
     );
+
     LogWrapper::new(multi.clone(), logger).try_init().unwrap();
     log::set_max_level(log_level);
+}
 
-    // 1. Discover .json files in cwd
-    let mut json_files: Vec<String> = read_dir(".")
+fn find_json_files() -> Result<Vec<String>> {
+    let mut files: Vec<String> = read_dir(".")
         .context("Could not read current directory.")?
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("json") {
-                path.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| s.to_owned())
+                path.file_name().and_then(|n| n.to_str()).map(String::from)
             } else {
                 None
             }
         })
         .collect();
 
-    if json_files.is_empty() {
+    if files.is_empty() {
         bail!("No .json files found in the current directory.");
     }
-    json_files.sort();
 
-    // 2. Ask user to pick
-    let chosen_file = Select::new("Select a JSON file to generate HTML for:", json_files)
+    files.sort_unstable();
+    Ok(files)
+}
+
+fn select_json_file(json_files: Vec<String>) -> Result<String> {
+    Select::new("Select a JSON file to generate HTML for:", json_files)
         .prompt()
-        .context("File selection cancelled.")?;
+        .context("File selection cancelled.")
+}
 
-    // 3. Read & parse
-    info!("Reading '{}'...", chosen_file);
-    let file = std::fs::File::open(&chosen_file)
-        .with_context(|| format!("Failed to open '{chosen_file}'"))?;
+fn load_json(path: &str) -> Result<Value> {
+    let file = File::open(path).with_context(|| format!("Failed to open '{path}'"))?;
     let reader = BufReader::new(file);
+    serde_json::from_reader(reader).context("Failed to parse JSON")
+}
 
-    info!("Parsing JSON...");
-    let json: Value = serde_json::from_reader(reader).context("Failed to parse JSON")?;
-
-    let root_type = json["_type"]
-        .as_str()
-        .context("Expected root '_type' field in JSON.")?;
-
-    info!("Root type: {}", root_type);
-
-    // 4. Prepare output directory
-    info!("Preparing out directory...");
+fn prepare_output() -> Result<()> {
     create_dir_all("out").context("Failed to create 'out/' directory.")?;
     copy("assets/style.css", "out/style.css").context("Failed to copy assets/style.css")?;
     copy("assets/script.js", "out/script.js").context("Failed to copy assets/script.js")?;
+    Ok(())
+}
 
-    let start = Instant::now();
-
-    // 5. Route by type
+fn route_root(json: &Value, root_type: &str, multi: &MultiProgress) -> Result<()> {
     match root_type {
         "<conversations Sordland>" | "<conversations Rizia>" => {
-            generate_conversations(&json, root_type, &multi)?;
+            generate_conversations(json, root_type, multi)
         }
-        "<entity data>" => {
-            generate_entity_data(&json, root_type, &multi)?;
-        }
-        other => {
-            bail!("Unknown root type: '{other}'");
-        }
+        "<entity data>" => generate_entity_data(json, root_type, multi),
+        other => bail!("Unknown root type: '{other}'"),
     }
-
-    let elapsed = start.elapsed();
-    info!("Done in {:.2?}. Open out/index.html to browse.", elapsed);
-    Ok(())
 }
 
 fn generate_conversations(json: &Value, root_type: &str, multi: &MultiProgress) -> Result<()> {
