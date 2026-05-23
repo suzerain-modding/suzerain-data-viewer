@@ -1,0 +1,11 @@
+[package]
+name = "suzerain_data_viewer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.102"
+log = "0.4.29"
+serde = "1.0.228"
+serde_json = "1.0.150"
+simplelog = "0.12.2"
