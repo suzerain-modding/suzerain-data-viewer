@@ -218,7 +218,9 @@ pub fn conversations_to_html_files(v: &Value, progress: &ProgressBar) -> Result<
     for (index_str, element) in entries {
         match conversation_to_html(element) {
             Ok(element_html) => {
-                let id = element["id"].as_i64().unwrap();
+                let id = element["id"]
+                    .as_i64()
+                    .context("Expected 'id' in 'Conversation' to be i64.")?;
                 let title = element["Title"].as_str().unwrap_or(index_str);
                 let file_path = format!("out/conversation{id}.html");
                 let body = format!(
@@ -235,7 +237,7 @@ pub fn conversations_to_html_files(v: &Value, progress: &ProgressBar) -> Result<
                     index_str = index_str,
                     element_html = element_html,
                 );
-                let content = html_document(&body, &format!("[{index_str}] {title}"), false);
+                let content = html_document(&body, &format!("[{index_str}] {title}"));
                 write(file_path, content)?;
             }
             Err(e) => {
@@ -288,18 +290,13 @@ pub fn generate_conversations_index(v: &Value, root_type: &str) -> Result<()> {
       <p class="index-subheading">{total} conversations</p>
     </div>
   </header>
-  <div class="search-bar-wrap">
-    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="search" id="search" class="search-input" placeholder="Filter conversations…" aria-label="Filter conversations">
-  </div>
   <div class="index-grid" id="index-grid">
     {items_html}
   </div>
-  <p class="no-results" id="no-results" hidden>No conversations match your search.</p>
 </div>"#
     );
 
-    let content = html_document(&body, &format!("Index {root_type}"), true);
+    let content = html_document(&body, &format!("Index {root_type}"));
     write("out/index.html", content)?;
     Ok(())
 }

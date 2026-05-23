@@ -16,7 +16,7 @@ use std::{
 
 fn main() -> Result<()> {
     let multi = MultiProgress::new();
-    init_logger(&multi);
+    init_logger(&multi)?;
     let json_files = find_json_files()?;
     let chosen_file = select_json_file(json_files)?;
 
@@ -38,7 +38,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn init_logger(multi: &MultiProgress) {
+fn init_logger(multi: &MultiProgress) -> Result<()> {
     let log_level = log::LevelFilter::Info;
     let logger = TermLogger::new(
         log_level,
@@ -47,8 +47,11 @@ fn init_logger(multi: &MultiProgress) {
         simplelog::ColorChoice::Auto,
     );
 
-    LogWrapper::new(multi.clone(), logger).try_init().unwrap();
+    LogWrapper::new(multi.clone(), logger)
+        .try_init()
+        .context("Failed to initialize logger")?;
     log::set_max_level(log_level);
+    Ok(())
 }
 
 fn find_json_files() -> Result<Vec<String>> {

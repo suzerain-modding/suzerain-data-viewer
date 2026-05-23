@@ -114,13 +114,12 @@ fn prop_row_num(label: &str, value: i64) -> String {
 }
 
 fn string_list_to_html(v: &Value) -> String {
-    if !v.is_object() {
-        return r#"<span class="field-value-empty">(not an object)</span>"#.to_string();
-    }
+    let obj = match v.as_object() {
+        Some(obj) => obj,
+        None => return r#"<span class="field-value-empty">(not an object)</span>"#.to_string(),
+    };
 
-    let mut items: Vec<_> = v
-        .as_object()
-        .unwrap()
+    let mut items: Vec<_> = obj
         .iter()
         .filter(|(k, _)| k.as_str() != "_type")
         .collect();
@@ -173,30 +172,8 @@ fn collapsible_section(label: &str, content_html: &str) -> String {
     )
 }
 
-pub fn html_document(body: &str, title: &str, is_index: bool) -> String {
+pub fn html_document(body: &str, title: &str) -> String {
     let escaped_title = escape_html(title);
-    let extra_script = if is_index {
-        r#"<script>
-  const searchInput = document.getElementById('search');
-  const grid = document.getElementById('index-grid');
-  const noResults = document.getElementById('no-results');
-  if (searchInput && grid) {
-    searchInput.addEventListener('input', () => {
-      const q = searchInput.value.toLowerCase();
-      let visible = 0;
-      grid.querySelectorAll('.index-card').forEach(card => {
-        const text = card.textContent.toLowerCase();
-        const show = text.includes(q);
-        card.style.display = show ? '' : 'none';
-        if (show) visible++;
-      });
-      noResults.hidden = visible > 0;
-    });
-  }
-</script>"#
-    } else {
-        ""
-    };
 
     format!(
         r#"<!DOCTYPE html>
@@ -215,7 +192,6 @@ pub fn html_document(body: &str, title: &str, is_index: bool) -> String {
     {body}
   </div>
   <script src="script.js"></script>
-  {extra_script}
 </body>
 </html>"#
     )

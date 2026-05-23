@@ -337,7 +337,7 @@ pub fn generate_entity_data_files(
                     count = count,
                     content_html = content_html,
                 );
-                let content = html_document(&body, label, false);
+                let content = html_document(&body, label);
                 write(&file_path, content)?;
 
                 index_cards.push_str(&format!(
@@ -386,7 +386,7 @@ pub fn generate_entity_data_files(
         index_cards = index_cards,
     );
 
-    let content = html_document(&body, &format!("Index {root_type}"), false);
+    let content = html_document(&body, &format!("Index {root_type}"));
     write("out/index.html", content)?;
 
     Ok(())
