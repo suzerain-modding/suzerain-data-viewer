@@ -1,17 +1,20 @@
 mod htmlgen;
 
 use crate::htmlgen::*;
+use anyhow::{Context, Result, bail};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
+use inquire::Select;
 use log::info;
 use serde_json::Value;
 use simplelog::TermLogger;
 use std::{
-    fs::{File, copy, create_dir_all},
+    fs::{copy, create_dir_all, read_dir},
     io::BufReader,
+    time::Instant,
 };
 
-fn main() {
+fn main() -> Result<()> {
     let log_level = log::LevelFilter::Info;
     let multi = MultiProgress::new();
     let logger = TermLogger::new(
@@ -20,46 +23,123 @@ fn main() {
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto,
     );
-
     LogWrapper::new(multi.clone(), logger).try_init().unwrap();
     log::set_max_level(log_level);
 
-    info!("Reading file...");
-    let file = File::open(
-        r#"C:\Users\shawn\MyFiles\suzerainmods\suzerain_data\suzerain_data_dumper\SuzerainDataDumper.conversations_Sordland.json"#,
-    ).unwrap();
+    // 1. Discover .json files in cwd
+    let mut json_files: Vec<String> = read_dir(".")
+        .context("Could not read current directory.")?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s.to_owned())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if json_files.is_empty() {
+        bail!("No .json files found in the current directory.");
+    }
+    json_files.sort();
+
+    // 2. Ask user to pick
+    let chosen_file = Select::new("Select a JSON file to generate HTML for:", json_files)
+        .prompt()
+        .context("File selection cancelled.")?;
+
+    // 3. Read & parse
+    info!("Reading '{}'...", chosen_file);
+    let file = std::fs::File::open(&chosen_file)
+        .with_context(|| format!("Failed to open '{chosen_file}'"))?;
     let reader = BufReader::new(file);
 
-    info!("Preparing out directory...");
-    create_dir_all("out").unwrap();
-    copy("assets/script.js", "out/script.js").unwrap();
-    copy("assets/style.css", "out/style.css").unwrap();
-
     info!("Parsing JSON...");
-    let v: Value = serde_json::from_reader(reader).unwrap();
+    let json: Value = serde_json::from_reader(reader).context("Failed to parse JSON")?;
 
-    let conversations = &v["conversations"];
+    let root_type = json["_type"]
+        .as_str()
+        .context("Expected root '_type' field in JSON.")?;
+
+    info!("Root type: {}", root_type);
+
+    // 4. Prepare output directory
+    info!("Preparing out directory...");
+    create_dir_all("out").context("Failed to create 'out/' directory.")?;
+    copy("assets/style.css", "out/style.css").context("Failed to copy assets/style.css")?;
+    copy("assets/script.js", "out/script.js").context("Failed to copy assets/script.js")?;
+
+    let start = Instant::now();
+
+    // 5. Route by type
+    match root_type {
+        "<conversations Sordland>" | "<conversations Rizia>" => {
+            generate_conversations(&json, root_type, &multi)?;
+        }
+        "<entity data>" => {
+            generate_entity_data(&json, root_type, &multi)?;
+        }
+        other => {
+            bail!("Unknown root type: '{other}'");
+        }
+    }
+
+    let elapsed = start.elapsed();
+    info!("Done in {:.2?}. Open out/index.html to browse.", elapsed);
+    Ok(())
+}
+
+fn generate_conversations(json: &Value, root_type: &str, multi: &MultiProgress) -> Result<()> {
+    let conversations = &json["conversations"];
+    if !conversations.is_object() {
+        bail!("Expected 'conversations' to be an object.");
+    }
+
+    let count = conversations
+        .as_object()
+        .map(|o| o.len().saturating_sub(1))
+        .unwrap_or(0) as u64;
 
     info!("Generating index...");
-    generate_index(conversations).unwrap();
+    generate_conversations_index(conversations, root_type)
+        .context("Failed to generate conversations index.")?;
 
-    let total = conversations
-        .as_object()
-        .map(|obj| obj.len().saturating_sub(1) as u64)
-        .unwrap_or(0);
-    let progress = multi.add(ProgressBar::new(total));
-    progress.set_style(
+    let progress = multi.add(make_progress_bar(count));
+    progress.set_message(format!("Writing conversation pages ({root_type})"));
+
+    info!("Generating conversation pages...");
+    conversations_to_html_files(conversations, &progress)
+        .context("Failed to generate conversation pages.")?;
+
+    progress.finish_with_message("Finished writing conversation pages.");
+    Ok(())
+}
+
+fn generate_entity_data(json: &Value, root_type: &str, multi: &MultiProgress) -> Result<()> {
+    info!("Generating entity data pages...");
+
+    let progress = multi.add(make_progress_bar(4));
+    progress.set_message("Generating entity data...");
+
+    generate_entity_data_files(json, &progress, root_type)
+        .context("Failed to generate entity data pages.")?;
+
+    progress.finish_with_message("Finished writing entity data pages.");
+    Ok(())
+}
+
+fn make_progress_bar(len: u64) -> ProgressBar {
+    let pb = ProgressBar::new(len);
+    pb.set_style(
         ProgressStyle::with_template(
             "{spinner:.green} {msg} {bar:40.cyan/blue} {pos}/{len} ({eta})",
         )
         .unwrap()
         .progress_chars("#>-"),
     );
-    progress.set_message("Writing conversation pages");
-
-    info!("Generating conversation pages...");
-    conversations_to_html_files(conversations, &progress).unwrap();
-    progress.finish_with_message("Finished writing conversation pages");
-
-    info!("Done. Open out/index.html to browse.");
+    pb
 }

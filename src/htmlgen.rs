@@ -387,10 +387,12 @@ pub fn conversations_to_html_files(v: &Value, progress: &ProgressBar) -> Result<
     Ok(())
 }
 
-pub fn generate_index(v: &Value) -> Result<()> {
+pub fn generate_conversations_index(v: &Value, root_type: &str) -> Result<()> {
     if !v.is_object() {
         bail!("Expected 'List' to be an object.");
     }
+
+    let root_type_escaped = escape_html(root_type);
 
     let obj = v.as_object().unwrap();
     let mut entries: Vec<(&String, &Value)> =
@@ -437,7 +439,7 @@ pub fn generate_index(v: &Value) -> Result<()> {
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     </div>
     <div>
-      <h1 class="index-heading">Suzerain Conversations</h1>
+      <h1 class="index-heading">{root_type_escaped}</h1>
       <p class="index-subheading">{total} conversations</p>
     </div>
     <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme">
@@ -455,12 +457,14 @@ pub fn generate_index(v: &Value) -> Result<()> {
 </div>"#
     );
 
-    let content = html_document(&body, "Suzerain Conversations", true);
+    let content = html_document(&body, &format!("Index {root_type}"), true);
     write("out/index.html", content)?;
     Ok(())
 }
 
 fn html_document(body: &str, title: &str, is_index: bool) -> String {
+    let escaped_title = escape_html(title);
+
     let extra_script = if is_index {
         r#"<script>
   const searchInput = document.getElementById('search');
@@ -490,7 +494,7 @@ fn html_document(body: &str, title: &str, is_index: bool) -> String {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title}</title>
+  <title>{escaped_title}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -505,4 +509,460 @@ fn html_document(body: &str, title: &str, is_index: bool) -> String {
 </body>
 </html>"#
     )
+}
+
+// ════════════════════════════════════════════════════════════════
+// ENTITY DATA
+// ════════════════════════════════════════════════════════════════
+
+// ── Shared sub-structures ─────────────────────────────────────────────────────
+
+fn story_fragment_properties_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'StoryFragmentProperties' to be an object.");
+    }
+    let begin = v["OnStoryFragmentBeginInstruction"].as_str().unwrap_or("");
+    let end = v["OnStoryFragmentEndInstruction"].as_str().unwrap_or("");
+    let condition = v["StoryFragmentCondition"].as_str().unwrap_or("");
+    Ok(format!(
+        r#"<div class="props-block">{}{}{}</div>"#,
+        optional_code_section("OnStoryFragmentBeginInstruction", begin),
+        optional_code_section("OnStoryFragmentEndInstruction", end),
+        optional_code_section("StoryFragmentCondition", condition),
+    ))
+}
+
+fn app_bundle_properties_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'AppBundleProperties' to be an object.");
+    }
+    let app_bundle = v["AppBundle"].as_str().unwrap_or("");
+    let story_packs_html = string_list_to_html(&v["StoryPacks"]);
+    Ok(format!(
+        r#"<div class="props-block">
+  {}
+  <div class="entry-section">
+    <h4 class="entry-section-label">StoryPacks</h4>
+    {}
+  </div>
+</div>"#,
+        prop_row("AppBundle", app_bundle),
+        story_packs_html,
+    ))
+}
+
+fn string_list_to_html(v: &Value) -> String {
+    if !v.is_object() {
+        return r#"<span class="field-value-empty">(not an object)</span>"#.to_string();
+    }
+    let obj = v.as_object().unwrap();
+    let mut items: Vec<(&String, &Value)> =
+        obj.iter().filter(|(k, _)| k.as_str() != "_type").collect();
+    if items.is_empty() {
+        return r#"<span class="field-value-empty">(empty)</span>"#.to_string();
+    }
+    items.sort_by(|a, b| {
+        let a_num = a.0.parse::<i64>();
+        let b_num = b.0.parse::<i64>();
+        match (a_num, b_num) {
+            (Ok(ia), Ok(ib)) => ia.cmp(&ib),
+            _ => a.0.cmp(b.0),
+        }
+    });
+    let tags: String = items
+        .iter()
+        .filter_map(|(_, v)| v.as_str())
+        .map(|s| format!(r#"<span class="string-tag">{}</span>"#, escape_html(s)))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(r#"<div class="string-tag-list">{tags}</div>"#)
+}
+
+// ── Helper re-used across all entity renderers ────────────────────────────────
+
+fn optional_code_section(label: &str, value: &str) -> String {
+    if value.is_empty() {
+        return String::new();
+    }
+    format!(
+        r#"<div class="entry-section">
+  <h4 class="entry-section-label">{label}</h4>
+  <pre class="code-block">{}</pre>
+</div>"#,
+        escape_html(value)
+    )
+}
+
+fn collapsible_section(label: &str, content_html: &str) -> String {
+    format!(
+        r#"<div class="entry-section">
+  <h4 class="entry-section-label collapsible-section-label">
+    <button class="toggle section-toggle" aria-expanded="false">
+      <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+           stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      {label}
+    </button>
+  </h4>
+  <div class="collapsible-section-content collapsible collapsed">
+    {content_html}
+  </div>
+</div>"#
+    )
+}
+
+fn prop_row_num(label: &str, value: i64) -> String {
+    format!(
+        r#"<div class="prop-row"><span class="prop-label">{label}</span><span class="prop-value prop-num">{value}</span></div>"#
+    )
+}
+
+// ── BillData ──────────────────────────────────────────────────────────────────
+
+fn bill_data_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'BillData' to be an object.");
+    }
+    let name = v["NameInDatabase"].as_str().unwrap_or("");
+    let path = v["Path"].as_str().unwrap_or("");
+    let bp = &v["BillProperties"];
+    let title = bp["Title"].as_str().unwrap_or("");
+    let hub_title = bp["HubTitle"].as_str().unwrap_or("");
+    let description = bp["Description"].as_str().unwrap_or("");
+    let hub_desc = bp["HubDescription"].as_str().unwrap_or("");
+    let is_veto_cond = bp["IsVetoDisabledCondition"].as_str().unwrap_or("");
+    let sign_vars = bp["SignVariables"].as_str().unwrap_or("");
+    let veto_vars = bp["VetoVariables"].as_str().unwrap_or("");
+
+    let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+    let sfp_html = story_fragment_properties_to_html(&v["StoryFragmentProperties"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+
+    Ok(format!(
+        r#"<div class="entity-card">
+  <div class="entity-top-row">
+    <span class="entity-title">{title_e}</span>
+    <div class="entry-meta-badges">
+      <span class="meta-badge meta-badge-path">{name_e}</span>
+    </div>
+  </div>
+  <div class="props-grid">
+    {}{}{}{}{}{}{} 
+  </div>
+  {}{}
+</div>"#,
+        prop_row("Path", path),
+        prop_row("HubTitle", hub_title),
+        prop_row("Description", description),
+        prop_row("HubDescription", hub_desc),
+        optional_code_section("IsVetoDisabledCondition", is_veto_cond),
+        optional_code_section("SignVariables", sign_vars),
+        optional_code_section("VetoVariables", veto_vars),
+        collapsible_section("AppBundleProperties", &app_bundle_html),
+        collapsible_section("StoryFragmentProperties", &sfp_html),
+        title_e = escape_html(title),
+        name_e = escape_html(name),
+    ))
+}
+
+fn bills_to_html(v: &Value) -> Result<String> {
+    list_to_html(v, "BillData", bill_data_to_html, |el| {
+        el["BillProperties"]["Title"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    })
+}
+
+// ── ConversationData ──────────────────────────────────────────────────────────
+
+fn conversation_data_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'ConversationData' to be an object.");
+    }
+    let name = v["NameInDatabase"].as_str().unwrap_or("");
+    let path = v["Path"].as_str().unwrap_or("");
+    let cp = &v["ConversationProperties"];
+    let title = cp["Title"].as_str().unwrap_or("");
+    let subtitle = cp["Subtitle"].as_str().unwrap_or("");
+    let dialogue = cp["Dialogue"].as_str().unwrap_or("");
+    let type_string = cp["TypeString"].as_str().unwrap_or("");
+    let is_on_start = cp["IsOnStart"].as_bool().unwrap_or(false);
+
+    let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+    let sfp_html = story_fragment_properties_to_html(&v["StoryFragmentProperties"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+
+    Ok(format!(
+        r#"<div class="entity-card">
+  <div class="entity-top-row">
+    <span class="entity-title">{title_e}</span>
+    <div class="entry-meta-badges">
+      <span class="meta-badge meta-badge-path">{name_e}</span>
+    </div>
+  </div>
+  <div class="props-grid">
+    {}{}{}{}{}
+  </div>
+  {}{}
+</div>"#,
+        prop_row("Path", path),
+        prop_row("Subtitle", subtitle),
+        prop_row("TypeString", type_string),
+        prop_row_bool("IsOnStart", is_on_start),
+        optional_code_section("Dialogue", dialogue),
+        collapsible_section("AppBundleProperties", &app_bundle_html),
+        collapsible_section("StoryFragmentProperties", &sfp_html),
+        title_e = escape_html(title),
+        name_e = escape_html(name),
+    ))
+}
+
+fn conversation_data_list_to_html(v: &Value) -> Result<String> {
+    list_to_html(v, "ConversationData", conversation_data_to_html, |el| {
+        el["ConversationProperties"]["Title"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    })
+}
+
+// ── DecisionData ──────────────────────────────────────────────────────────────
+
+fn decision_option_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'DecisionOption' to be an object.");
+    }
+    Ok(format!(
+        r#"<div class="decision-option">{}{}{}</div>"#,
+        prop_row("Text", v["Text"].as_str().unwrap_or("")),
+        optional_code_section("Condition", v["Condition"].as_str().unwrap_or("")),
+        optional_code_section("Instruction", v["Instruction"].as_str().unwrap_or("")),
+    ))
+}
+
+fn decision_options_to_html(v: &Value) -> Result<String> {
+    list_to_html(v, "DecisionOption", decision_option_to_html, |el| {
+        el["Text"].as_str().unwrap_or("").to_string()
+    })
+}
+
+fn decision_data_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'DecisionData' to be an object.");
+    }
+    let name = v["NameInDatabase"].as_str().unwrap_or("");
+    let path = v["Path"].as_str().unwrap_or("");
+    let dp = &v["DecisionProperties"];
+    let title = dp["Title"].as_str().unwrap_or("");
+    let hub_title = dp["HubTitle"].as_str().unwrap_or("");
+    let description = dp["Description"].as_str().unwrap_or("");
+    let hub_desc = dp["HubDescription"].as_str().unwrap_or("");
+
+    let options_html = decision_options_to_html(&dp["Options"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+    let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+    let sfp_html = story_fragment_properties_to_html(&v["StoryFragmentProperties"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+
+    Ok(format!(
+        r#"<div class="entity-card">
+  <div class="entity-top-row">
+    <span class="entity-title">{title_e}</span>
+    <div class="entry-meta-badges">
+      <span class="meta-badge meta-badge-path">{name_e}</span>
+    </div>
+  </div>
+  <div class="props-grid">
+    {}{}{}{}
+  </div>
+  {}{}{}
+</div>"#,
+        prop_row("Path", path),
+        prop_row("HubTitle", hub_title),
+        prop_row("Description", description),
+        prop_row("HubDescription", hub_desc),
+        collapsible_section("Options", &options_html),
+        collapsible_section("AppBundleProperties", &app_bundle_html),
+        collapsible_section("StoryFragmentProperties", &sfp_html),
+        title_e = escape_html(title),
+        name_e = escape_html(name),
+    ))
+}
+
+fn decisions_to_html(v: &Value) -> Result<String> {
+    list_to_html(v, "DecisionData", decision_data_to_html, |el| {
+        el["DecisionProperties"]["Title"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    })
+}
+
+// ── NewsData ──────────────────────────────────────────────────────────────────
+
+fn news_data_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'NewsData' to be an object.");
+    }
+    let name = v["NameInDatabase"].as_str().unwrap_or("");
+    let path = v["Path"].as_str().unwrap_or("");
+    let np = &v["NewsProperties"];
+    let title = np["Title"].as_str().unwrap_or("");
+    let description = np["Description"].as_str().unwrap_or("");
+    let newspaper = np["Newspaper"].as_str().unwrap_or("");
+    let is_enabled_var = np["IsEnabledVariable"].as_str().unwrap_or("");
+    let index = np["Index"].as_i64().unwrap_or(0);
+    let turn_no = np["TurnNo"].as_i64().unwrap_or(0);
+
+    let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+
+    Ok(format!(
+        r#"<div class="entity-card">
+  <div class="entity-top-row">
+    <span class="entity-title">{title_e}</span>
+    <div class="entry-meta-badges">
+      <span class="meta-badge">{newspaper_e}</span>
+      <span class="meta-badge meta-badge-path">{name_e}</span>
+    </div>
+  </div>
+  <div class="props-grid">
+    {}{}{}{}{}
+  </div>
+  {}
+</div>"#,
+        prop_row("Path", path),
+        prop_row("Description", description),
+        prop_row_num("Index", index),
+        prop_row_num("TurnNo", turn_no),
+        prop_row("IsEnabledVariable", is_enabled_var),
+        collapsible_section("AppBundleProperties", &app_bundle_html),
+        title_e = escape_html(title),
+        name_e = escape_html(name),
+        newspaper_e = escape_html(newspaper),
+    ))
+}
+
+fn news_list_to_html(v: &Value) -> Result<String> {
+    list_to_html(v, "NewsData", news_data_to_html, |el| {
+        el["NewsProperties"]["Title"]
+            .as_str()
+            .unwrap_or("")
+            .to_string()
+    })
+}
+
+// ── Entity data index + section pages (public entry point) ───────────────────
+
+pub fn generate_entity_data_files(
+    v: &Value,
+    progress: &ProgressBar,
+    root_type: &str,
+) -> Result<()> {
+    if !v.is_object() {
+        bail!("Expected entity data root to be an object.");
+    }
+
+    let root_type_escaped = escape_html(root_type);
+
+    type GenFn = fn(&Value) -> Result<String>;
+    let sections: &[(&str, &str, &str, GenFn)] = &[
+        ("AllBillsData", "Bills", "📜", bills_to_html),
+        (
+            "AllConversationsData",
+            "Conversations",
+            "💬",
+            conversation_data_list_to_html,
+        ),
+        ("AllDecisionsData", "Decisions", "⚖", decisions_to_html),
+        ("NewsData", "News", "📰", news_list_to_html),
+    ];
+
+    let mut index_cards = String::new();
+
+    for (key, label, icon, gen_fn) in sections {
+        let section_data = &v[key];
+        let count = section_data
+            .as_object()
+            .map(|o| o.len().saturating_sub(1))
+            .unwrap_or(0);
+
+        progress.set_message(format!("Generating {label}…"));
+
+        match gen_fn(section_data) {
+            Ok(content_html) => {
+                let file_path = format!("out/entity_{}.html", key.to_lowercase());
+                let body = format!(
+                    r#"<div class="page-header">
+  <a href="index.html" class="back-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+    Back
+  </a>
+</div>
+<div class="section-group" style="margin-top:var(--space-2)">
+  <h2 class="conversation-title">{label}</h2>
+  <p class="index-subheading" style="margin-bottom:var(--space-4)">{count} items</p>
+  {content_html}
+</div>"#
+                );
+                let content = html_document(&body, label, false);
+                std::fs::write(&file_path, content)?;
+
+                index_cards.push_str(&format!(
+                    r#"<a href="entity_{key_lower}.html" class="index-card">
+  <div class="index-card-inner">
+    <span class="index-card-num entity-section-icon">{icon}</span>
+    <span class="index-card-title">{label}</span>
+    <span class="index-card-count">{count} items</span>
+  </div>
+  <svg class="index-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+       stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+</a>"#,
+                    key_lower = key.to_lowercase(),
+                ));
+            }
+            Err(e) => {
+                log::warn!("Failed to generate entity section '{key}': {e}");
+            }
+        }
+        progress.inc(1);
+    }
+
+    // Entity data index (no search bar needed — only 4 cards)
+    let body = format!(
+        r#"<div class="index-page">
+  <header class="index-header">
+    <div class="index-header-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="index-heading">{root_type_escaped}</h1>
+      <p class="index-subheading">Select a category</p>
+    </div>
+    <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </header>
+  <div class="index-grid">
+    {index_cards}
+  </div>
+</div>"#
+    );
+
+    let content = html_document(&body, &format!("Index {root_type}"), false);
+    std::fs::write("out/index.html", content)?;
+
+    Ok(())
 }
