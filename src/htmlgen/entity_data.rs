@@ -67,15 +67,13 @@ fn bill_data_to_html(v: &Value) -> Result<String> {
         r#"<div class="entity-card">
   <div class="entity-top-row">
     <span class="entity-title">{title_e}</span>
-    <div class="entry-meta-badges">
-      <span class="meta-badge meta-badge-path">{name_e}</span>
-    </div>
   </div>
   <div class="props-grid">
-    {}{}{}{}{}{}{}
+    {}{}{}{}{}{}{}{}
   </div>
   {}{}
 </div>"#,
+        prop_row("NameInDatabase", name),
         prop_row("Path", path),
         prop_row("HubTitle", hub_title),
         prop_row("Description", description),
@@ -86,7 +84,6 @@ fn bill_data_to_html(v: &Value) -> Result<String> {
         collapsible_section("AppBundleProperties", &app_bundle_html),
         collapsible_section("StoryFragmentProperties", &sfp_html),
         title_e = escape_html(title),
-        name_e = escape_html(name),
     ))
 }
 
@@ -122,15 +119,13 @@ fn conversation_data_to_html(v: &Value) -> Result<String> {
         r#"<div class="entity-card">
   <div class="entity-top-row">
     <span class="entity-title">{title_e}</span>
-    <div class="entry-meta-badges">
-      <span class="meta-badge meta-badge-path">{name_e}</span>
-    </div>
   </div>
   <div class="props-grid">
-    {}{}{}{}{}
+    {}{}{}{}{}{}
   </div>
   {}{}
 </div>"#,
+        prop_row("NameInDatabase", name),
         prop_row("Path", path),
         prop_row("Subtitle", subtitle),
         prop_row("TypeString", type_string),
@@ -139,7 +134,6 @@ fn conversation_data_to_html(v: &Value) -> Result<String> {
         collapsible_section("AppBundleProperties", &app_bundle_html),
         collapsible_section("StoryFragmentProperties", &sfp_html),
         title_e = escape_html(title),
-        name_e = escape_html(name),
     ))
 }
 
@@ -195,15 +189,13 @@ fn decision_data_to_html(v: &Value) -> Result<String> {
         r#"<div class="entity-card">
   <div class="entity-top-row">
     <span class="entity-title">{title_e}</span>
-    <div class="entry-meta-badges">
-      <span class="meta-badge meta-badge-path">{name_e}</span>
-    </div>
   </div>
   <div class="props-grid">
-    {}{}{}{}
+    {}{}{}{}{}
   </div>
   {}{}{}
 </div>"#,
+        prop_row("NameInDatabase", name),
         prop_row("Path", path),
         prop_row("HubTitle", hub_title),
         prop_row("Description", description),
@@ -212,7 +204,6 @@ fn decision_data_to_html(v: &Value) -> Result<String> {
         collapsible_section("AppBundleProperties", &app_bundle_html),
         collapsible_section("StoryFragmentProperties", &sfp_html),
         title_e = escape_html(title),
-        name_e = escape_html(name),
     ))
 }
 
@@ -247,16 +238,14 @@ fn news_data_to_html(v: &Value) -> Result<String> {
         r#"<div class="entity-card">
   <div class="entity-top-row">
     <span class="entity-title">{title_e}</span>
-    <div class="entry-meta-badges">
-      <span class="meta-badge">{newspaper_e}</span>
-      <span class="meta-badge meta-badge-path">{name_e}</span>
-    </div>
   </div>
   <div class="props-grid">
-    {}{}{}{}{}
+    {}{}{}{}{}{}{}
   </div>
   {}
 </div>"#,
+        prop_row("NameInDatabase", name),
+        prop_row("Newspaper", newspaper),
         prop_row("Path", path),
         prop_row("Description", description),
         prop_row_num("Index", index),
@@ -264,8 +253,6 @@ fn news_data_to_html(v: &Value) -> Result<String> {
         prop_row("IsEnabledVariable", is_enabled_var),
         collapsible_section("AppBundleProperties", &app_bundle_html),
         title_e = escape_html(title),
-        name_e = escape_html(name),
-        newspaper_e = escape_html(newspaper),
     ))
 }
 
