@@ -3,6 +3,9 @@ name = "suzerain_data_viewer"
 version = "0.1.0"
 edition = "2024"
 
+[profile.release]
+strip = true
+
 [dependencies]
 anyhow = "1.0.102"
 indicatif = "0.18.4"
