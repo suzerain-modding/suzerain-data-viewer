@@ -566,6 +566,16 @@ button {
   font-style: italic;
 }
 
+.en-field-display {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-offset);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  line-height: 1.6;
+}
+
 /* ── Link ───────────────────────────────────────────────── */
 .link {
   padding: var(--space-3);

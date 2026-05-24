@@ -135,6 +135,27 @@ pub fn dialogue_entry_to_html(v: &Value) -> Result<String> {
     let outgoing_links_html = links_to_html(&v["outgoingLinks"])
         .context("Failed to generate HTML for 'outgoingLinks' in 'DialogueEntry'.")?;
 
+    // Extract the 'en' field value if it exists
+    let en_field_html = if let Some(fields_obj) = v["fields"].as_object() {
+        let mut en_value = None;
+        for (_, field) in fields_obj.iter() {
+            if field["title"].as_str() == Some("en") {
+                en_value = field["value"].as_str();
+                break;
+            }
+        }
+        if let Some(value) = en_value {
+            format!(
+                r#"<div class="en-field-display">{}</div>"#,
+                escape_html(value)
+            )
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
     Ok(format!(
         r#"<div class="dialogue-entry" id="DialogueEntry-{id}">
   <div class="entry-top-row">
@@ -146,6 +167,7 @@ pub fn dialogue_entry_to_html(v: &Value) -> Result<String> {
       <span class="meta-badge">conversationID: {conversation_id}</span>
     </div>
   </div>
+  {en_field_html}
   {conditions_section}
   {script_section}
   <div class="entry-section">

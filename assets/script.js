@@ -40,7 +40,9 @@
     // Use event delegation so it works for all .toggle buttons, including
     // those inside .collapsible-section-content (section sub-toggles).
     document.addEventListener("click", function (e) {
-      const btn = e.target.closest(".toggle");
+      const btn =
+        e.target.closest(".toggle") ??
+        e.target.closest(".list-item-header")?.querySelector(".toggle");
       if (!btn) return;
 
       const expanded = btn.getAttribute("aria-expanded") === "true";
