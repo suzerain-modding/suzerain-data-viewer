@@ -9,7 +9,7 @@ use log::info;
 use serde_json::Value;
 use simplelog::TermLogger;
 use std::{
-    fs::{File, copy, create_dir_all, read_dir},
+    fs::{File, create_dir_all, exists, read_dir, write},
     io::BufReader,
     time::Instant,
 };
@@ -17,6 +17,9 @@ use std::{
 fn main() -> Result<()> {
     let multi = MultiProgress::new();
     init_logger(&multi)?;
+
+    info!("Suzerain Data Viewer {}", env!("CARGO_PKG_VERSION"));
+
     let json_files = find_json_files()?;
     let chosen_file = select_json_file(json_files)?;
 
@@ -32,7 +35,7 @@ fn main() -> Result<()> {
     let start = Instant::now();
     route_root(&json, root_type, &multi)?;
     info!(
-        "Done in {:.2?}. Open out/index.html to browse.",
+        "Done in {:.2?}. Open 'out/index.html' to browse.",
         start.elapsed()
     );
     Ok(())
@@ -69,7 +72,7 @@ fn find_json_files() -> Result<Vec<String>> {
         .collect();
 
     if files.is_empty() {
-        bail!("No .json files found in the current directory.");
+        bail!("No '.json' files found in the current directory.");
     }
 
     files.sort_unstable();
@@ -89,9 +92,12 @@ fn load_json(path: &str) -> Result<Value> {
 }
 
 fn prepare_output() -> Result<()> {
+    if exists("out")? {
+        bail!("'out/' directory already exists.");
+    }
     create_dir_all("out").context("Failed to create 'out/' directory.")?;
-    copy("assets/style.css", "out/style.css").context("Failed to copy assets/style.css")?;
-    copy("assets/script.js", "out/script.js").context("Failed to copy assets/script.js")?;
+    write("out/style.css", include_str!("../assets/style.css"))?;
+    write("out/script.js", include_str!("../assets/script.js"))?;
     Ok(())
 }
 
