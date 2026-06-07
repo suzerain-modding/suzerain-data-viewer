@@ -94,11 +94,11 @@ pub fn links_to_html(v: &Value) -> Result<String> {
         let origin = element["originDialogueID"]
             .as_i64()
             .map(|id| id.to_string())
-            .unwrap_or_else(|| "?".to_string());
+            .unwrap_or("?".to_string());
         let destination = element["destinationDialogueID"]
             .as_i64()
             .map(|id| id.to_string())
-            .unwrap_or_else(|| "?".to_string());
+            .unwrap_or("?".to_string());
         format!("Link {} → {}", origin, destination)
     })
 }

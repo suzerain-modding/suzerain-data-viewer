@@ -4,7 +4,6 @@ use crate::htmlgen::*;
 use anyhow::{Context, Result, bail};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use indicatif_log_bridge::LogWrapper;
-use inquire::Select;
 use log::info;
 use serde_json::Value;
 use simplelog::TermLogger;
@@ -20,16 +19,22 @@ fn main() -> Result<()> {
 
     info!("Suzerain Data Viewer {}", env!("CARGO_PKG_VERSION"));
 
+    if exists("out")? {
+        bail!(
+            "'out/' directory already exists. Delete, rename, or move it before running Suzerain Data Viewer."
+        );
+    }
+
     let json_files = find_json_files()?;
     let chosen_file = select_json_file(json_files)?;
 
-    info!("Reading '{}'...", chosen_file);
+    info!("Reading '{chosen_file}'...");
     let json = load_json(&chosen_file)?;
     let root_type = json["_type"]
         .as_str()
         .context("Expected root '_type' field in JSON.")?;
 
-    info!("Root type: {}", root_type);
+    info!("Root type: {root_type}");
     prepare_output()?;
 
     let start = Instant::now();
@@ -52,7 +57,7 @@ fn init_logger(multi: &MultiProgress) -> Result<()> {
 
     LogWrapper::new(multi.clone(), logger)
         .try_init()
-        .context("Failed to initialize logger")?;
+        .context("Failed to initialize logger.")?;
     log::set_max_level(log_level);
     Ok(())
 }
@@ -80,15 +85,15 @@ fn find_json_files() -> Result<Vec<String>> {
 }
 
 fn select_json_file(json_files: Vec<String>) -> Result<String> {
-    Select::new("Select a JSON file to generate HTML for:", json_files)
+    inquire::Select::new("Select a JSON file to generate HTML for:", json_files)
         .prompt()
         .context("File selection cancelled.")
 }
 
 fn load_json(path: &str) -> Result<Value> {
-    let file = File::open(path).with_context(|| format!("Failed to open '{path}'"))?;
+    let file = File::open(path).context(format!("Failed to open '{path}'."))?;
     let reader = BufReader::new(file);
-    serde_json::from_reader(reader).context("Failed to parse JSON")
+    serde_json::from_reader(reader).context("Failed to parse JSON.")
 }
 
 fn prepare_output() -> Result<()> {

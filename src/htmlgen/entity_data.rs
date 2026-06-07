@@ -96,6 +96,82 @@ fn bills_to_html(v: &Value) -> Result<String> {
     })
 }
 
+fn conditional_instruction_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'ConditionalInstruction' to be an object.");
+    }
+
+    Ok(format!(
+        r#"<div class="decision-option">{}{}</div>"#,
+        optional_code_section("Condition", v["Condition"].as_str().unwrap_or_default()),
+        optional_code_section("Instruction", v["Instruction"].as_str().unwrap_or_default()),
+    ))
+}
+
+fn conditional_instructions_to_html(v: &Value) -> Result<String> {
+    list_to_html(
+        v,
+        "ConditionalInstruction",
+        conditional_instruction_to_html,
+        |el| el["Instruction"].as_str().unwrap_or_default().to_owned(),
+    )
+}
+
+fn conditional_instruction_data_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'ConditionalInstructionData' to be an object.");
+    }
+
+    let name = v["NameInDatabase"].as_str().unwrap_or_default();
+    let path = v["Path"].as_str().unwrap_or_default();
+    let p = &v["ConditionalInstructionProperties"];
+    let check_on_step_no = p["CheckOnStepNo"].as_i64().unwrap_or(0);
+    let check_on_turn_no = p["CheckOnTurnNo"].as_i64().unwrap_or(0);
+    let check_per_step = p["CheckPerStep"].as_bool().unwrap_or(false);
+    let check_per_story_fragment = p["CheckPerStoryFragment"].as_bool().unwrap_or(false);
+    let check_per_turn = p["CheckPerTurn"].as_bool().unwrap_or(false);
+    let is_one_time = p["IsOneTime"].as_bool().unwrap_or(false);
+    let priority = p["Priority"].as_i64().unwrap_or(0);
+
+    let instructions_html = conditional_instructions_to_html(&p["ConditionalInstructions"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+    let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+
+    Ok(format!(
+        r#"<div class="entity-card">
+  <div class="entity-top-row">
+    <span class="entity-title">{name_e}</span>
+  </div>
+  <div class="props-grid">
+    {}{}{}{}{}{}{}{}{}
+  </div>
+  {}{}
+</div>"#,
+        prop_row("NameInDatabase", name),
+        prop_row("Path", path),
+        prop_row_num("Priority", priority),
+        prop_row_num("CheckOnStepNo", check_on_step_no),
+        prop_row_num("CheckOnTurnNo", check_on_turn_no),
+        prop_row_bool("CheckPerStep", check_per_step),
+        prop_row_bool("CheckPerStoryFragment", check_per_story_fragment),
+        prop_row_bool("CheckPerTurn", check_per_turn),
+        prop_row_bool("IsOneTime", is_one_time),
+        collapsible_section("ConditionalInstructions", &instructions_html),
+        collapsible_section("AppBundleProperties", &app_bundle_html),
+        name_e = escape_html(name),
+    ))
+}
+
+fn conditional_instruction_data_list_to_html(v: &Value) -> Result<String> {
+    list_to_html(
+        v,
+        "ConditionalInstructionData",
+        conditional_instruction_data_to_html,
+        |el| el["NameInDatabase"].as_str().unwrap_or_default().to_owned(),
+    )
+}
+
 fn conversation_data_to_html(v: &Value) -> Result<String> {
     if !v.is_object() {
         bail!("Expected 'ConversationData' to be an object.");
@@ -103,12 +179,12 @@ fn conversation_data_to_html(v: &Value) -> Result<String> {
 
     let name = v["NameInDatabase"].as_str().unwrap_or_default();
     let path = v["Path"].as_str().unwrap_or_default();
-    let cp = &v["ConversationProperties"];
-    let title = cp["Title"].as_str().unwrap_or_default();
-    let subtitle = cp["Subtitle"].as_str().unwrap_or_default();
-    let dialogue = cp["Dialogue"].as_str().unwrap_or_default();
-    let type_string = cp["TypeString"].as_str().unwrap_or_default();
-    let is_on_start = cp["IsOnStart"].as_bool().unwrap_or(false);
+    let p = &v["ConversationProperties"];
+    let title = p["Title"].as_str().unwrap_or_default();
+    let subtitle = p["Subtitle"].as_str().unwrap_or_default();
+    let dialogue = p["Dialogue"].as_str().unwrap_or_default();
+    let type_string = p["TypeString"].as_str().unwrap_or_default();
+    let is_on_start = p["IsOnStart"].as_bool().unwrap_or(false);
 
     let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
         .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
@@ -283,6 +359,12 @@ pub fn generate_entity_data_files(
             "Conversations",
             "💬",
             conversation_data_list_to_html,
+        ),
+        (
+            "conditionalInstructionData",
+            "Conditional Instructions",
+            "❔",
+            conditional_instruction_data_list_to_html,
         ),
         ("AllDecisionsData", "Decisions", "⚖", decisions_to_html),
         ("NewsData", "News", "📰", news_list_to_html),
