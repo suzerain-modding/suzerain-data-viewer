@@ -26,18 +26,15 @@ fn app_bundle_properties_to_html(v: &Value) -> Result<String> {
         bail!("Expected 'AppBundleProperties' to be an object.");
     }
 
-    let app_bundle = v["AppBundle"].as_str().unwrap_or_default();
     let story_packs_html = string_list_to_html(&v["StoryPacks"]);
 
     Ok(format!(
         r#"<div class="props-block">
-  {}
   <div class="entry-section">
     <h4 class="entry-section-label">StoryPacks</h4>
     {}
   </div>
 </div>"#,
-        prop_row("AppBundle", app_bundle),
         story_packs_html,
     ))
 }
