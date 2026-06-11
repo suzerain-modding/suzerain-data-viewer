@@ -338,6 +338,105 @@ fn news_list_to_html(v: &Value) -> Result<String> {
     })
 }
 
+fn step_entry_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'StepEntry' to be an object.");
+    }
+
+    let fragments_html = string_list_to_html(&v["Fragments"]);
+
+    Ok(format!(
+        r#"<div class="props-block">
+  <div class="entry-section">
+    <h4 class="entry-section-label">Fragments</h4>
+    {}
+  </div>
+  {}
+</div>"#,
+        fragments_html,
+        optional_code_section(
+            "OnStepStartInstruction",
+            v["OnStepStartInstruction"].as_str().unwrap_or_default(),
+        ),
+    ))
+}
+
+fn steps_to_html(v: &Value) -> Result<String> {
+    list_to_html(v, "StepEntry", step_entry_to_html, |_| String::new())
+}
+
+fn turn_entry_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'TurnEntry' to be an object.");
+    }
+
+    let transition_title = v["TransitionTitle"].as_str().unwrap_or_default();
+    let condition = v["Condition"].as_str().unwrap_or_default();
+    let on_turn_start = v["OnTurnStartInstruction"].as_str().unwrap_or_default();
+
+    let steps_html = steps_to_html(&v["Steps"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+
+    Ok(format!(
+        r#"<div class="props-block">
+  <div class="props-grid">
+    {}
+  </div>
+  {}{}
+  {}
+</div>"#,
+        prop_row("TransitionTitle", transition_title),
+        optional_code_section("Condition", condition),
+        optional_code_section("OnTurnStartInstruction", on_turn_start),
+        collapsible_section("Steps", &steps_html),
+    ))
+}
+
+fn turns_to_html(v: &Value) -> Result<String> {
+    list_to_html(v, "TurnEntry", turn_entry_to_html, |el| {
+        el["TransitionTitle"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned()
+    })
+}
+
+fn game_flow_data_to_html(v: &Value) -> Result<String> {
+    if !v.is_object() {
+        bail!("Expected 'GameFlowData' to be an object.");
+    }
+
+    let description = v["Description"].as_str().unwrap_or_default();
+    let path = v["Path"].as_str().unwrap_or_default();
+    let story_pack = v["StoryPack"].as_str().unwrap_or_default();
+
+    let turns_html = turns_to_html(&v["Turns"])
+        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+
+    Ok(format!(
+        r#"<div class="entity-card">
+  <div class="entity-top-row">
+    <span class="entity-title">{title}</span>
+  </div>
+  <div class="props-grid">
+    {}{}{}
+  </div>
+  {}
+</div>"#,
+        prop_row("Description", description),
+        prop_row("Path", path),
+        prop_row("StoryPack", story_pack),
+        collapsible_section("Turns", &turns_html),
+        title = escape_html(story_pack),
+    ))
+}
+
+pub fn game_flow_data_list_to_html(v: &Value) -> Result<String> {
+    list_to_html(v, "GameFlowData", game_flow_data_to_html, |el| {
+        el["StoryPack"].as_str().unwrap_or_default().to_owned()
+    })
+}
+
 pub fn generate_entity_data_files(
     v: &Value,
     progress: &ProgressBar,
@@ -350,20 +449,27 @@ pub fn generate_entity_data_files(
     let root_type_escaped = escape_html(root_type);
     type GenFn = fn(&Value) -> Result<String>;
     let sections: &[(&str, &str, &str, GenFn)] = &[
+        // Alphabetical order by the title (second argument).
         ("AllBillsData", "Bills", "📜", bills_to_html),
-        (
-            "AllConversationsData",
-            "Conversations",
-            "💬",
-            conversation_data_list_to_html,
-        ),
         (
             "conditionalInstructionData",
             "Conditional Instructions",
             "❔",
             conditional_instruction_data_list_to_html,
         ),
+        (
+            "AllConversationsData",
+            "Conversations",
+            "💬",
+            conversation_data_list_to_html,
+        ),
         ("AllDecisionsData", "Decisions", "⚖", decisions_to_html),
+        (
+            "GameFlowData",
+            "Game Flow Data",
+            "🎯",
+            game_flow_data_list_to_html,
+        ),
         ("NewsData", "News", "📰", news_list_to_html),
     ];
 
