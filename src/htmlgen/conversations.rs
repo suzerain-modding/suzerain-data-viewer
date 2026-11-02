@@ -12,9 +12,16 @@ pub fn field_to_html(v: &Value) -> Result<String> {
     let type_str = v["typeString"]
         .as_str()
         .context("Expected 'typeString' in 'Field' to be string.")?;
-    let value = v["value"]
-        .as_str()
-        .context("Expected 'value' in 'Field' to be string.")?;
+    let value_html = match &v["value"] {
+        Value::Null => r#"<span class="field-value field-value-empty">(null)</span>"#.to_string(),
+        Value::String(value) if value.is_empty() => {
+            r#"<span class="field-value field-value-empty">(empty)</span>"#.to_string()
+        }
+        Value::String(value) => {
+            format!(r#"<span class="field-value">{}</span>"#, escape_html(value))
+        }
+        _ => bail!("Expected 'value' in 'Field' to be string or null."),
+    };
 
     Ok(format!(
         r#"<div class="field">
@@ -30,11 +37,7 @@ pub fn field_to_html(v: &Value) -> Result<String> {
         } else {
             escape_html(type_str)
         },
-        if value.is_empty() {
-            r#"<span class="field-value field-value-empty">(empty)</span>"#.to_string()
-        } else {
-            format!(r#"<span class="field-value">{}</span>"#, escape_html(value))
-        }
+        value_html,
     ))
 }
 

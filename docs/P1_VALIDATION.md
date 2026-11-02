@@ -25,14 +25,16 @@ The four legacy exports imported into a disposable index with these totals:
 | Conversations | 512 |
 | Dialogue nodes | 200,663 |
 | Outgoing links | 253,215 |
-| Fields | 2,060,888 |
+| Fields retained in original node JSON | 2,060,888 |
 | Script locations | 87,236 |
 | Game-flow fragment locations | 522 |
 | Actor-name records | 103 |
 | Bills / conversations / decisions | 26 / 264 / 310 |
 | Conditional instructions / game flows / news | 368 / 2 / 1,476 |
 
-The index occupied approximately 740 MiB. `validate --check-files` confirmed all
+The version 2 index occupied approximately 624 MiB, down from approximately 740 MiB
+before removing the unused field table and index (116 MiB saved on these dumps).
+`validate --check-files` confirmed all
 four original hashes and zero foreign-key failures. It reported 24,432 groups of
 reused Articy IDs within conversations and one unresolved link to conversation
 391, entry 1 in the Rizia export. These are coverage/lookup diagnostics, not proof
@@ -73,6 +75,32 @@ when switching export types, and refused unmarked directories or collisions with
 unrelated pages. Invalid JSON and a malformed dialogue child failed before replacing
 the existing site. The interactive picker was preserved in code; terminal interaction
 with that picker was not separately exercised.
+
+## Follow-up review fixes
+
+After the review fixes, a fresh version 2 import retained the same node, edge,
+script and game-flow counts, and the full-corpus queries above passed again.
+The removed field table/index were absent from SQLite's schema; the original raw
+entry 105 matched the earlier import exactly. Version 1 indexes were refused with
+guidance to import into a new database path. Import and response output checks
+continued to protect input files, existing response files and a new response path
+equal to the database path after consolidating destination resolution.
+
+Twenty-three focused manual CLI checks covered nullable fields, invalid field
+types, overwrite recovery, nested rendering failures and destination protection.
+Setting the old index page read-only reproduced a failure after a new conversation
+page was copied. Clearing that attribute and retrying succeeded with the new
+ownership marker. A read-only obsolete page also produced a deletion failure that
+could be retried successfully. A read-only marker failed before publishing pages;
+unrelated files and conflicting page names remained protected.
+
+Null field values rendered as `(null)`, empty strings as `(empty)`, and nonempty
+strings remained HTML-escaped. Numeric field values were rejected. Invalid nested
+Turns, Steps, Fragments, StoryPacks, Options and ConditionalInstructions collections,
+plus a non-string fragment item, all returned nonzero status with context. Hashes
+of every previously generated entity file stayed unchanged after those failures.
+The full entity export and both conversation exports rendered successfully after
+propagating these errors. No test framework or test project was introduced.
 
 Input JSON, generated HTML, indexes and probe outputs are local artifacts and are
 not included in the repository change. See [CLI.md](CLI.md) for usage and limits.

@@ -27,6 +27,11 @@ import, one file at a time; query commands read the index rather than reparsing 
 Conversation records contain their header; their child nodes are stored separately.
 The index schema is internal and can change; use CLI results as the supported interface.
 
+Index version 2 keeps dialogue fields in each original node record rather than
+duplicating them in a separate table. The former `totals.fields` statistic is removed.
+Version 1 indexes must be reimported into a new database path; there is no migration
+or dependency on the removed field table. Raw field values and query views are preserved.
+
 Imports append captures. A source with the same canonical path and SHA-256 is
 skipped. A changed file at the same path becomes a separate source; older indexed
 captures remain queryable. Source IDs from `sources` disambiguate these captures.
@@ -176,7 +181,13 @@ render into a fresh temporary sibling directory. Replacement copies generated
 files, removes obsolete generated files from the previous marker and preserves
 unrelated files. New pages conflicting with unrelated files are refused. Output
 symlinks and non-file destinations are refused. Do not edit the ownership marker.
+After conflict checks, the marker atomically claims the old and new generated paths
+before any pages are copied. A failed copy or obsolete-page deletion leaves that
+ownership list intact, so the same command can be retried after fixing the I/O error.
+Successful regeneration narrows the marker to the final generated file list.
 Rendering errors leave previous output intact; an I/O failure during replacement
 can leave partially updated pages, so rerun the command after resolving the failure.
 Malformed items now fail conversion with context and a nonzero exit status rather
-than silently producing a partial site. Source dumps are never modified.
+than silently producing a partial site, including nested entity collections and
+invalid string-list elements. Nullable dialogue field values render as `(null)`,
+distinct from `(empty)` strings. Source dumps are never modified.

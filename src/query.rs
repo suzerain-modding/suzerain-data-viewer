@@ -1,6 +1,5 @@
 use crate::{
     cli::{Direction, Language, NodeSelector, Output, Page, Read, SearchKind},
-    import::totals,
     index::*,
     output,
 };

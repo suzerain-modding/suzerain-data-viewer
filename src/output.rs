@@ -1,4 +1,7 @@
-use crate::cli::{Format, Output};
+use crate::{
+    cli::{Format, Output},
+    index::absolute_destination,
+};
 use anyhow::{Result, bail};
 use serde_json::Value;
 use std::{
@@ -24,20 +27,7 @@ pub fn check_destination(output: &Output) -> Result<()> {
                 path.display()
             );
         }
-        let absolute = |p: &std::path::Path| -> Result<std::path::PathBuf> {
-            if p.exists() {
-                return Ok(p.canonicalize()?);
-            }
-            let parent = p
-                .parent()
-                .filter(|v| !v.as_os_str().is_empty())
-                .unwrap_or(std::path::Path::new("."));
-            Ok(parent.canonicalize()?.join(
-                p.file_name()
-                    .ok_or_else(|| anyhow::anyhow!("Output must name a file"))?,
-            ))
-        };
-        if absolute(path)? == absolute(&output.database)? {
+        if absolute_destination(path)? == absolute_destination(&output.database)? {
             bail!("The response output and database must be different files.");
         }
     }

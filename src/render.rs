@@ -91,12 +91,6 @@ pub fn run(input: &Path, output: &Path, overwrite: bool) -> Result<()> {
         for name in &files {
             check_name(name)?;
         }
-        write(
-            temporary.join(MARKER),
-            serde_json::to_vec_pretty(
-                &serde_json::json!({"generator":"suzerain_data_viewer","files":files}),
-            )?,
-        )?;
         if output.exists() {
             for name in old_files
                 .iter()
@@ -119,6 +113,13 @@ pub fn run(input: &Path, output: &Path, overwrite: bool) -> Result<()> {
                     bail!("HTML output must not replace the input dump.");
                 }
             }
+            // Claim the checked destinations before publishing any pages. If a copy or
+            // deletion fails, the marker still owns partial output so --overwrite can retry.
+            let mut owned: Vec<_> = old_files.iter().chain(&files).cloned().collect();
+            owned.sort();
+            owned.dedup();
+            write_marker(&temporary, &owned)?;
+            fs::rename(temporary.join(MARKER), output.join(MARKER))?;
             for name in &files {
                 fs::copy(temporary.join(name), output.join(name))?;
             }
@@ -127,8 +128,10 @@ pub fn run(input: &Path, output: &Path, overwrite: bool) -> Result<()> {
                     fs::remove_file(output.join(name))?;
                 }
             }
-            fs::copy(temporary.join(MARKER), output.join(MARKER))?;
+            write_marker(&temporary, &files)?;
+            fs::rename(temporary.join(MARKER), output.join(MARKER))?;
         } else {
+            write_marker(&temporary, &files)?;
             fs::rename(&temporary, output)?;
         }
         Ok(())
@@ -147,6 +150,16 @@ pub fn run(input: &Path, output: &Path, overwrite: bool) -> Result<()> {
         output.join("index.html").display()
     );
     Ok(())
+}
+
+fn write_marker(directory: &Path, files: &[String]) -> Result<()> {
+    write(
+        directory.join(MARKER),
+        serde_json::to_vec_pretty(
+            &serde_json::json!({"generator":"suzerain_data_viewer","files":files}),
+        )?,
+    )
+    .context("Failed to write HTML ownership marker")
 }
 
 fn check_name(name: &str) -> Result<()> {

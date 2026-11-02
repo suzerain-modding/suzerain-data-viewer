@@ -2,11 +2,7 @@ use crate::{cli::Output, index::*};
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
-use std::{
-    collections::HashSet,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashSet, fs, path::PathBuf};
 
 pub fn run(inputs: &[PathBuf], output: &Output, replace: bool) -> Result<Value> {
     let paths = input_files(inputs)?;
@@ -93,18 +89,6 @@ pub fn run(inputs: &[PathBuf], output: &Output, replace: bool) -> Result<Value> 
     Ok(response)
 }
 
-fn absolute_destination(path: &Path) -> Result<PathBuf> {
-    if path.exists() {
-        return Ok(path.canonicalize()?);
-    }
-    let parent = path
-        .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
-    Ok(parent
-        .canonicalize()?
-        .join(path.file_name().context("Index path must name a file")?))
-}
 fn input_files(inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     for input in inputs {
@@ -301,8 +285,6 @@ fn import_conversations(db: &Connection, source_id: i64, pack: &str, data: &Valu
             for (fi, field) in fields {
                 let name = required_text(field, "title")?;
                 let value = field["value"].as_str();
-                db.prepare_cached("INSERT INTO fields(record_id,ordinal,title,field_type,value) VALUES(?,?,?,?,?)")?
-                    .execute(params![id,fi,name,required_text(field,"typeString")?,value])?;
                 if let Some(value) = value {
                     if name.starts_with("Sequence") {
                         insert_script(
@@ -535,20 +517,4 @@ fn import_entities(db: &Connection, source_id: i64, data: &Value) -> Result<()> 
         }
     }
     Ok(())
-}
-
-pub fn totals(db: &Connection) -> Result<Value> {
-    let count = |table: &str| -> Result<i64> {
-        Ok(db.query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))?)
-    };
-    let mut kinds = serde_json::Map::new();
-    let mut statement =
-        db.prepare("SELECT kind,count(*) FROM records GROUP BY kind ORDER BY kind")?;
-    for row in statement.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))? {
-        let (kind, count) = row?;
-        kinds.insert(kind, json!(count));
-    }
-    Ok(
-        json!({"sources":count("sources")?,"records_by_kind":kinds,"edges":count("edges")?,"fields":count("fields")?,"script_locations":count("scripts")?,"gameflow_locations":count("schedule")?,"import_warnings":count("issues")?}),
-    )
 }

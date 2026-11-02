@@ -5,12 +5,12 @@ use sha2::{Digest, Sha256};
 use std::{
     fs::File,
     io::{BufRead, BufReader, Read},
-    path::Path,
+    path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 pub const APPLICATION_ID: i64 = 0x53445631;
-pub const INDEX_VERSION: i64 = 1;
+pub const INDEX_VERSION: i64 = 2;
 pub const RECORD_COLUMNS: &str = "r.id,r.source_id,r.kind,r.pack,r.conversation_id,r.entry_id,r.name,r.title,r.articy_id,r.text,r.json_pointer,r.raw_json,r.dialogue_title";
 
 pub const SCHEMA: &str = r#"
@@ -31,8 +31,6 @@ CREATE INDEX IF NOT EXISTS articy_lookup ON records(articy_id COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS entity_lookup ON records(name,kind);
 CREATE INDEX IF NOT EXISTS dialogue_lookup ON records(dialogue_title);
 CREATE TABLE IF NOT EXISTS record_packs(record_id INTEGER REFERENCES records(id) ON DELETE CASCADE,pack TEXT,PRIMARY KEY(record_id,pack));
-CREATE TABLE IF NOT EXISTS fields(record_id INTEGER REFERENCES records(id) ON DELETE CASCADE,ordinal TEXT,title TEXT,field_type TEXT,value TEXT);
-CREATE INDEX IF NOT EXISTS fields_record ON fields(record_id);
 CREATE TABLE IF NOT EXISTS edges(
  id INTEGER PRIMARY KEY,source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
  origin_record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
@@ -85,6 +83,20 @@ pub fn open(path: &Path, writable: bool) -> Result<Connection> {
         db.execute_batch("BEGIN DEFERRED")?;
     }
     Ok(db)
+}
+
+pub fn absolute_destination(path: &Path) -> Result<PathBuf> {
+    if path.exists() {
+        return Ok(path.canonicalize()?);
+    }
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    Ok(parent.canonicalize()?.join(
+        path.file_name()
+            .context("Destination path must name a file")?,
+    ))
 }
 
 pub fn read_json(path: &Path) -> Result<Value> {
@@ -290,4 +302,20 @@ pub fn warn(db: &Connection, source: i64, code: &str, pointer: &str, message: &s
     db.prepare_cached("INSERT INTO issues(source_id,code,json_pointer,message) VALUES(?,?,?,?)")?
         .execute(params![source, code, pointer, message])?;
     Ok(())
+}
+
+pub fn totals(db: &Connection) -> Result<Value> {
+    let count = |table: &str| -> Result<i64> {
+        Ok(db.query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))?)
+    };
+    let mut kinds = serde_json::Map::new();
+    let mut statement =
+        db.prepare("SELECT kind,count(*) FROM records GROUP BY kind ORDER BY kind")?;
+    for row in statement.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))? {
+        let (kind, count) = row?;
+        kinds.insert(kind, json!(count));
+    }
+    Ok(
+        json!({"sources":count("sources")?,"records_by_kind":kinds,"edges":count("edges")?,"script_locations":count("scripts")?,"gameflow_locations":count("schedule")?,"import_warnings":count("issues")?}),
+    )
 }
