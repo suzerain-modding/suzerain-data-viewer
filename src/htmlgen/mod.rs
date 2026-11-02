@@ -3,9 +3,8 @@ mod entity_data;
 
 use anyhow::{Context, Result, bail};
 use indicatif::ProgressBar;
-use log::warn;
 use serde_json::Value;
-use std::fs::write;
+use std::{fs::write, path::Path};
 
 pub use conversations::*;
 pub use entity_data::*;
@@ -50,10 +49,8 @@ pub fn list_to_html(
                 ));
             }
             Err(e) => {
-                warn!("Failed to generate HTML for '{name}': {e}");
-                result.push_str(&format!(
-                    r#"<div class="list-item error"><span class="error-msg">⚠ Failed to render item [{index_str}]</span></div>"#
-                ));
+                return Err(e)
+                    .with_context(|| format!("Failed to render '{name}' item [{index_str}]"));
             }
         }
     }
@@ -113,28 +110,25 @@ fn prop_row_num(label: &str, value: i64) -> String {
     )
 }
 
-fn string_list_to_html(v: &Value) -> String {
-    let obj = match v.as_object() {
-        Some(obj) => obj,
-        None => return r#"<span class="field-value-empty">(not an object)</span>"#.to_string(),
-    };
-
-    let mut items: Vec<_> = obj.iter().filter(|(k, _)| k.as_str() != "_type").collect();
-
+fn string_list_to_html(v: &Value) -> Result<String> {
+    let items = object_entries(v)?;
     if items.is_empty() {
-        return r#"<span class="field-value-empty">(empty)</span>"#.to_string();
+        return Ok(r#"<span class="field-value-empty">(empty)</span>"#.to_string());
     }
-
-    items.sort_by(|a, b| compare_keys(a.0, b.0));
-
-    let tags = items
-        .iter()
-        .filter_map(|(_, v)| v.as_str())
-        .map(|s| format!(r#"<span class="string-tag">{}</span>"#, escape_html(s)))
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    format!(r#"<div class="string-tag-list">{tags}</div>"#)
+    let mut tags = Vec::new();
+    for (index, value) in items {
+        let text = value
+            .as_str()
+            .with_context(|| format!("Expected string at list item [{index}]"))?;
+        tags.push(format!(
+            r#"<span class="string-tag">{}</span>"#,
+            escape_html(text)
+        ));
+    }
+    Ok(format!(
+        r#"<div class="string-tag-list">{}</div>"#,
+        tags.join(" ")
+    ))
 }
 
 fn optional_code_section(label: &str, value: &str) -> String {

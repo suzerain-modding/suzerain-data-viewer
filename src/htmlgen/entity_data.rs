@@ -26,7 +26,8 @@ fn app_bundle_properties_to_html(v: &Value) -> Result<String> {
         bail!("Expected 'AppBundleProperties' to be an object.");
     }
 
-    let story_packs_html = string_list_to_html(&v["StoryPacks"]);
+    let story_packs_html =
+        string_list_to_html(&v["StoryPacks"]).context("Failed to render StoryPacks")?;
 
     Ok(format!(
         r#"<div class="props-block">
@@ -56,9 +57,9 @@ fn bill_data_to_html(v: &Value) -> Result<String> {
     let veto_vars = bp["VetoVariables"].as_str().unwrap_or_default();
 
     let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render AppBundleProperties")?;
     let sfp_html = story_fragment_properties_to_html(&v["StoryFragmentProperties"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render StoryFragmentProperties")?;
 
     Ok(format!(
         r#"<div class="entity-card">
@@ -131,9 +132,9 @@ fn conditional_instruction_data_to_html(v: &Value) -> Result<String> {
     let priority = p["Priority"].as_i64().unwrap_or(0);
 
     let instructions_html = conditional_instructions_to_html(&p["ConditionalInstructions"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render ConditionalInstructions")?;
     let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render AppBundleProperties")?;
 
     Ok(format!(
         r#"<div class="entity-card">
@@ -184,9 +185,9 @@ fn conversation_data_to_html(v: &Value) -> Result<String> {
     let is_on_start = p["IsOnStart"].as_bool().unwrap_or(false);
 
     let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render AppBundleProperties")?;
     let sfp_html = story_fragment_properties_to_html(&v["StoryFragmentProperties"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render StoryFragmentProperties")?;
 
     Ok(format!(
         r#"<div class="entity-card">
@@ -251,12 +252,12 @@ fn decision_data_to_html(v: &Value) -> Result<String> {
     let description = dp["Description"].as_str().unwrap_or_default();
     let hub_desc = dp["HubDescription"].as_str().unwrap_or_default();
 
-    let options_html = decision_options_to_html(&dp["Options"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+    let options_html =
+        decision_options_to_html(&dp["Options"]).context("Failed to render Options")?;
     let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render AppBundleProperties")?;
     let sfp_html = story_fragment_properties_to_html(&v["StoryFragmentProperties"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render StoryFragmentProperties")?;
 
     Ok(format!(
         r#"<div class="entity-card">
@@ -305,7 +306,7 @@ fn news_data_to_html(v: &Value) -> Result<String> {
     let turn_no = np["TurnNo"].as_i64().unwrap_or(0);
 
     let app_bundle_html = app_bundle_properties_to_html(&v["AppBundleProperties"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+        .context("Failed to render AppBundleProperties")?;
 
     Ok(format!(
         r#"<div class="entity-card">
@@ -343,7 +344,8 @@ fn step_entry_to_html(v: &Value) -> Result<String> {
         bail!("Expected 'StepEntry' to be an object.");
     }
 
-    let fragments_html = string_list_to_html(&v["Fragments"]);
+    let fragments_html =
+        string_list_to_html(&v["Fragments"]).context("Failed to render Fragments")?;
 
     Ok(format!(
         r#"<div class="props-block">
@@ -374,8 +376,7 @@ fn turn_entry_to_html(v: &Value) -> Result<String> {
     let condition = v["Condition"].as_str().unwrap_or_default();
     let on_turn_start = v["OnTurnStartInstruction"].as_str().unwrap_or_default();
 
-    let steps_html = steps_to_html(&v["Steps"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+    let steps_html = steps_to_html(&v["Steps"]).context("Failed to render Steps")?;
 
     Ok(format!(
         r#"<div class="props-block">
@@ -410,8 +411,7 @@ fn game_flow_data_to_html(v: &Value) -> Result<String> {
     let path = v["Path"].as_str().unwrap_or_default();
     let story_pack = v["StoryPack"].as_str().unwrap_or_default();
 
-    let turns_html = turns_to_html(&v["Turns"])
-        .unwrap_or_else(|e| format!(r#"<span class="error-msg">⚠ {e}</span>"#));
+    let turns_html = turns_to_html(&v["Turns"]).context("Failed to render Turns")?;
 
     Ok(format!(
         r#"<div class="entity-card">
@@ -441,6 +441,7 @@ pub fn generate_entity_data_files(
     v: &Value,
     progress: &ProgressBar,
     root_type: &str,
+    output: &Path,
 ) -> Result<()> {
     if !v.is_object() {
         bail!("Expected entity data root to be an object.");
@@ -486,10 +487,7 @@ pub fn generate_entity_data_files(
 
         match gen_fn(section_data) {
             Ok(content_html) => {
-                let file_path = format!(
-                    "out/entity_{key_lower}.html",
-                    key_lower = key.to_lowercase()
-                );
+                let file_path = output.join(format!("entity_{}.html", key.to_lowercase()));
                 let body = format!(
                     r#"<div class="page-header">
   <a href="index.html" class="back-link">
@@ -530,7 +528,7 @@ pub fn generate_entity_data_files(
                 ));
             }
             Err(e) => {
-                warn!("Failed to generate entity section '{key}': {e}");
+                return Err(e).with_context(|| format!("Failed to render entity section '{key}'"));
             }
         }
         progress.inc(1);
@@ -559,7 +557,7 @@ pub fn generate_entity_data_files(
     );
 
     let content = html_document(&body, &format!("Index {root_type}"));
-    write("out/index.html", content)?;
+    write(output.join("index.html"), content)?;
 
     Ok(())
 }
