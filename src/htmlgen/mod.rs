@@ -3,9 +3,8 @@ mod entity_data;
 
 use anyhow::{Context, Result, bail};
 use indicatif::ProgressBar;
-use log::warn;
 use serde_json::Value;
-use std::fs::write;
+use std::{fs::write, path::Path};
 
 pub use conversations::*;
 pub use entity_data::*;
@@ -50,10 +49,8 @@ pub fn list_to_html(
                 ));
             }
             Err(e) => {
-                warn!("Failed to generate HTML for '{name}': {e}");
-                result.push_str(&format!(
-                    r#"<div class="list-item error"><span class="error-msg">⚠ Failed to render item [{index_str}]</span></div>"#
-                ));
+                return Err(e)
+                    .with_context(|| format!("Failed to render '{name}' item [{index_str}]"));
             }
         }
     }

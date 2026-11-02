@@ -441,6 +441,7 @@ pub fn generate_entity_data_files(
     v: &Value,
     progress: &ProgressBar,
     root_type: &str,
+    output: &Path,
 ) -> Result<()> {
     if !v.is_object() {
         bail!("Expected entity data root to be an object.");
@@ -486,10 +487,7 @@ pub fn generate_entity_data_files(
 
         match gen_fn(section_data) {
             Ok(content_html) => {
-                let file_path = format!(
-                    "out/entity_{key_lower}.html",
-                    key_lower = key.to_lowercase()
-                );
+                let file_path = output.join(format!("entity_{}.html", key.to_lowercase()));
                 let body = format!(
                     r#"<div class="page-header">
   <a href="index.html" class="back-link">
@@ -530,7 +528,7 @@ pub fn generate_entity_data_files(
                 ));
             }
             Err(e) => {
-                warn!("Failed to generate entity section '{key}': {e}");
+                return Err(e).with_context(|| format!("Failed to render entity section '{key}'"));
             }
         }
         progress.inc(1);
@@ -559,7 +557,7 @@ pub fn generate_entity_data_files(
     );
 
     let content = html_document(&body, &format!("Index {root_type}"));
-    write("out/index.html", content)?;
+    write(output.join("index.html"), content)?;
 
     Ok(())
 }

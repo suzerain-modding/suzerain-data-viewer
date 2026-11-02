@@ -235,7 +235,7 @@ pub fn conversation_to_html(v: &Value) -> Result<String> {
     ))
 }
 
-pub fn conversations_to_html_files(v: &Value, progress: &ProgressBar) -> Result<()> {
+pub fn conversations_to_html_files(v: &Value, progress: &ProgressBar, output: &Path) -> Result<()> {
     let entries = object_entries(v)?;
     for (index_str, element) in entries {
         match conversation_to_html(element) {
@@ -244,7 +244,7 @@ pub fn conversations_to_html_files(v: &Value, progress: &ProgressBar) -> Result<
                     .as_i64()
                     .context("Expected 'id' in 'Conversation' to be i64.")?;
                 let title = element["Title"].as_str().unwrap_or(index_str);
-                let file_path = format!("out/conversation{id}.html");
+                let file_path = output.join(format!("conversation{id}.html"));
                 let body = format!(
                     r#"<div class="page-header">
   <a href="index.html" class="back-link">
@@ -263,7 +263,8 @@ pub fn conversations_to_html_files(v: &Value, progress: &ProgressBar) -> Result<
                 write(file_path, content)?;
             }
             Err(e) => {
-                warn!("Failed to generate HTML for 'Conversation': {e}");
+                return Err(e)
+                    .with_context(|| format!("Failed to render conversation [{index_str}]"));
             }
         }
         progress.inc(1);
@@ -272,7 +273,7 @@ pub fn conversations_to_html_files(v: &Value, progress: &ProgressBar) -> Result<
     Ok(())
 }
 
-pub fn generate_conversations_index(v: &Value, root_type: &str) -> Result<()> {
+pub fn generate_conversations_index(v: &Value, root_type: &str, output: &Path) -> Result<()> {
     let root_type_escaped = escape_html(root_type);
     let entries = object_entries(v)?;
 
@@ -319,6 +320,6 @@ pub fn generate_conversations_index(v: &Value, root_type: &str) -> Result<()> {
     );
 
     let content = html_document(&body, &format!("Index {root_type}"));
-    write("out/index.html", content)?;
+    write(output.join("index.html"), content)?;
     Ok(())
 }
