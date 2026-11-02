@@ -14,6 +14,36 @@ Suzerain Data Viewer has builds for Windows x64 and Linux x64 (glibc).
 5. Select the JSON file to read.
 6. Once done, open the generated `out/index.html` file to inspect.
 
+## Building from Source
+
+The compiler is pinned in `rust-toolchain.toml` to Rust **1.95.0**. Install Rust with rustup;
+Install the pinned toolchain once with `rustup toolchain install 1.95.0`. The preflight
+does not install compilers automatically. Rustup selects the pin when building this checkout.
+On Windows, also install Visual Studio C++ Build Tools with the Windows SDK and MSVC x64 tools.
+The .NET SDK and game assemblies are not needed to compile Data Viewer.
+
+```powershell
+pwsh -NoProfile -File scripts/preflight.ps1
+cargo build --locked
+cargo build --locked --release
+```
+
+The preflight reports compiler versions, the Windows MSVC toolset where applicable, and
+output-directory write access. It does not build, convert dumps, or modify the input data.
+
+Output defaults to `target/debug/` or `target/release/`. To keep outputs elsewhere, set
+`CARGO_TARGET_DIR` in the current shell before both preflight and build:
+
+```powershell
+$env:CARGO_TARGET_DIR = 'D:/SuzerainDataViewer/artifacts'
+cargo build --locked --release
+```
+
+The release workflow uses the same pinned compiler and committed `Cargo.lock`.
+To verify a build manually, copy a JSON dump to a disposable working directory and run the
+built executable there. The converter writes `out/` in its working directory; it does not
+modify the source dump. Noninteractive conversion is planned separately.
+
 ## Disclaimers
 
 Some parts of this project were created with AI assistance.
